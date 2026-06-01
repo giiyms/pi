@@ -74,4 +74,18 @@ export {
 	type TurnStartEvent,
 	type WorkingIndicatorOptions,
 } from "./extensions/index.ts";
+export {
+	hashSessionAnalyticsString,
+	type ProjectSessionAnalyticsOptions,
+	type ProjectSessionHeaderAnalyticsOptions,
+	projectSessionEntryForAnalytics,
+	projectSessionForAnalytics,
+	projectSessionHeaderForAnalytics,
+	SESSION_ANALYTICS_SCHEMA_VERSION,
+	type SessionAnalyticsContentStats,
+	type SessionAnalyticsEntryRecord,
+	type SessionAnalyticsRecord,
+	type SessionAnalyticsSessionRecord,
+	type SessionAnalyticsUsage,
+} from "./session-analytics.ts";
 export { createSyntheticSourceInfo } from "./source-info.ts";
