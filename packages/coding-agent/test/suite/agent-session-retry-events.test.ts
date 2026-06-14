@@ -31,28 +31,6 @@ describe("AgentSession retry and event characterization", () => {
 	});
 
 	it("retries after a transient error and succeeds", async () => {
-		const harness = await createHarness({ settings: { retry: { enabled: true, maxRetries: 3, baseDelayMs: 1 } } });
-		harnesses.push(harness);
-		const retryEvents: string[] = [];
-		harness.session.subscribe((event) => {
-			if (event.type === "auto_retry_start") retryEvents.push(`start:${event.attempt}`);
-			if (event.type === "auto_retry_end") retryEvents.push(`end:${event.success}`);
-		});
-
-		harness.setResponses([
-			fauxAssistantMessage("", { stopReason: "error", errorMessage: "overloaded_error" }),
-			fauxAssistantMessage("recovered"),
-		]);
-
-		await harness.session.prompt("test");
-
-		expect(retryEvents).toEqual(["start:1", "end:true"]);
-		expect(harness.eventsOfType("agent_end").map((event) => event.willRetry)).toEqual([true, false]);
-		expect(harness.faux.state.callCount).toBe(2);
-		expect(harness.session.isRetrying).toBe(false);
-	});
-
-	it("retries when an excluded custom message follows the transient error", async () => {
 		const harness = await createHarness({
 			settings: { retry: { enabled: true, maxRetries: 3, baseDelayMs: 1 } },
 			extensionFactories: [
@@ -73,6 +51,12 @@ describe("AgentSession retry and event characterization", () => {
 			],
 		});
 		harnesses.push(harness);
+		const retryEvents: string[] = [];
+		harness.session.subscribe((event) => {
+			if (event.type === "auto_retry_start") retryEvents.push(`start:${event.attempt}`);
+			if (event.type === "auto_retry_end") retryEvents.push(`end:${event.success}`);
+		});
+
 		harness.setResponses([
 			fauxAssistantMessage("", { stopReason: "error", errorMessage: "overloaded_error" }),
 			fauxAssistantMessage("recovered"),
@@ -80,7 +64,10 @@ describe("AgentSession retry and event characterization", () => {
 
 		await harness.session.prompt("test");
 
+		expect(retryEvents).toEqual(["start:1", "end:true"]);
+		expect(harness.eventsOfType("agent_end").map((event) => event.willRetry)).toEqual([true, false]);
 		expect(harness.faux.state.callCount).toBe(2);
+		expect(harness.session.isRetrying).toBe(false);
 		expect(
 			harness.session.messages.some((message) => message.role === "custom" && message.customType === "status"),
 		).toBe(true);

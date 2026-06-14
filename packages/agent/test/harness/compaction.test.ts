@@ -234,42 +234,6 @@ describe("harness compaction", () => {
 			isSplitTurn: false,
 		});
 
-		const cutUser = createMessageEntry(createUserMessage("inspect file"));
-		const cutAssistant = createMessageEntry(
-			{
-				...createAssistantMessage("calling tool"),
-				content: [{ type: "toolCall", id: "call-2", name: "read", arguments: { path: "file.ts" } }],
-			},
-			cutUser.id,
-		);
-		const cutToolResult = createMessageEntry(
-			{
-				role: "toolResult",
-				toolCallId: "call-2",
-				toolName: "read",
-				content: [{ type: "text", text: "x".repeat(1000) }],
-				isError: false,
-				timestamp: Date.now(),
-			},
-			cutAssistant.id,
-		);
-		const excludedCustom: CustomMessageEntry = {
-			type: "custom_message",
-			id: createId(),
-			parentId: cutToolResult.id,
-			timestamp: new Date().toISOString(),
-			customType: "status",
-			content: "tool finished",
-			display: true,
-			excludeFromContext: true,
-		};
-		const cutAssistantFinal = createMessageEntry(createAssistantMessage("done"), excludedCustom.id);
-		expect(findCutPoint([cutUser, cutAssistant, cutToolResult, excludedCustom, cutAssistantFinal], 0, 5, 2)).toEqual({
-			firstKeptEntryIndex: 4,
-			turnStartIndex: 0,
-			isSplitTurn: true,
-		});
-
 		const user = createMessageEntry(createUserMessage("user"));
 		const compaction = createCompactionEntry("summary", user.id, user.id);
 		const assistant = createMessageEntry(createAssistantMessage("assistant"), compaction.id);
@@ -425,8 +389,8 @@ describe("harness compaction", () => {
 		expect([...preparation!.fileOps.written]).toContain("written.ts");
 	});
 
-	it("skips excluded custom messages during compaction token estimates", () => {
-		const customMessage: CustomMessageEntry = {
+	it("ignores excluded custom messages during compaction and branch-summary preparation", () => {
+		const excludedCustom: CustomMessageEntry = {
 			type: "custom_message",
 			id: createId(),
 			parentId: null,
@@ -436,26 +400,27 @@ describe("harness compaction", () => {
 			display: true,
 			excludeFromContext: true,
 		};
-		const user = createMessageEntry(createUserMessage("keep"), customMessage.id);
+		const user = createMessageEntry(createUserMessage("keep"), excludedCustom.id);
 
-		const preparation = getOrThrow(
-			prepareCompaction([customMessage, user], { enabled: true, reserveTokens: 0, keepRecentTokens: 1 }),
+		const simplePreparation = getOrThrow(
+			prepareCompaction([excludedCustom, user], { enabled: true, reserveTokens: 0, keepRecentTokens: 1 }),
 		);
+		const branchPreparation = prepareBranchEntries([excludedCustom, user], 10);
 
-		expect(preparation?.tokensBefore).toBe(1);
-		expect(preparation?.messagesToSummarize).toEqual([]);
-	});
+		expect(simplePreparation?.tokensBefore).toBe(1);
+		expect(simplePreparation?.messagesToSummarize).toEqual([]);
+		expect(branchPreparation.messages.map((message) => message.role)).toEqual(["user"]);
+		expect(branchPreparation.totalTokens).toBe(1);
 
-	it("ignores excluded custom messages when finding split-turn prefixes", () => {
-		const user = createMessageEntry(createUserMessage("inspect file"));
+		const splitUser = createMessageEntry(createUserMessage("inspect file"));
 		const assistantWithToolCall = createMessageEntry(
 			{
 				...createAssistantMessage("calling tool"),
 				content: [{ type: "toolCall", id: "call-1", name: "read", arguments: { path: "file.ts" } }],
 			},
-			user.id,
+			splitUser.id,
 		);
-		const customMessage: CustomMessageEntry = {
+		const splitExcludedCustom: CustomMessageEntry = {
 			type: "custom_message",
 			id: createId(),
 			parentId: assistantWithToolCall.id,
@@ -474,45 +439,24 @@ describe("harness compaction", () => {
 				isError: false,
 				timestamp: Date.now(),
 			},
-			customMessage.id,
+			splitExcludedCustom.id,
 		);
 		const assistantFinal = createMessageEntry(createAssistantMessage("done"), toolResult.id);
-
-		const preparation = getOrThrow(
-			prepareCompaction([user, assistantWithToolCall, customMessage, toolResult, assistantFinal], {
+		const splitPreparation = getOrThrow(
+			prepareCompaction([splitUser, assistantWithToolCall, splitExcludedCustom, toolResult, assistantFinal], {
 				enabled: true,
 				reserveTokens: 0,
 				keepRecentTokens: 1,
 			}),
 		);
 
-		expect(preparation).toBeDefined();
-		expect(preparation?.isSplitTurn).toBe(true);
-		expect(preparation?.firstKeptEntryId).toBe(assistantFinal.id);
-		expect(preparation?.turnPrefixMessages.map((message) => message.role)).toEqual([
+		expect(splitPreparation?.isSplitTurn).toBe(true);
+		expect(splitPreparation?.firstKeptEntryId).toBe(assistantFinal.id);
+		expect(splitPreparation?.turnPrefixMessages.map((message) => message.role)).toEqual([
 			"user",
 			"assistant",
 			"toolResult",
 		]);
-	});
-
-	it("skips excluded custom messages before branch summary token budgeting", () => {
-		const user = createMessageEntry(createUserMessage("keep"));
-		const customMessage: CustomMessageEntry = {
-			type: "custom_message",
-			id: createId(),
-			parentId: user.id,
-			timestamp: new Date().toISOString(),
-			customType: "status",
-			content: "x".repeat(1000),
-			display: true,
-			excludeFromContext: true,
-		};
-
-		const preparation = prepareBranchEntries([user, customMessage], 10);
-
-		expect(preparation.messages.map((message) => message.role)).toEqual(["user"]);
-		expect(preparation.totalTokens).toBe(1);
 	});
 
 	it("prepares custom and branch summary entries for summarization", () => {

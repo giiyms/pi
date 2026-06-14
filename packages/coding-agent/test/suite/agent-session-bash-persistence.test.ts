@@ -145,40 +145,16 @@ describe("AgentSession bash and persistence characterization", () => {
 		};
 		const harness = await createHarness({ tools: [echoTool] });
 		harnesses.push(harness);
+		let providerUserTexts: string[] = [];
 		harness.setResponses([
-			fauxAssistantMessage([fauxToolCall("echo", { text: "hello" })], { stopReason: "toolUse" }),
+			(context) => {
+				providerUserTexts = context.messages
+					.filter((message) => message.role === "user")
+					.map((message) => getMessageText(message));
+				return fauxAssistantMessage([fauxToolCall("echo", { text: "hello" })], { stopReason: "toolUse" });
+			},
 			fauxAssistantMessage("done"),
 		]);
-
-		await harness.session.sendCustomMessage({
-			customType: "note",
-			content: "hello",
-			display: true,
-			details: { a: 1 },
-		});
-		await harness.session.prompt("start");
-
-		const entries = harness.sessionManager.getEntries();
-		expect(entries.map((entry) => entry.type)).toEqual([
-			"custom_message",
-			"message",
-			"message",
-			"message",
-			"message",
-		]);
-		expect(harness.session.messages.map((message) => message.role)).toEqual([
-			"custom",
-			"user",
-			"assistant",
-			"toolResult",
-			"assistant",
-		]);
-	});
-
-	it("excludes flagged custom messages from LLM context while preserving them", async () => {
-		const harness = await createHarness();
-		harnesses.push(harness);
-		let userTexts: string[] = [];
 
 		await harness.session.sendCustomMessage({
 			customType: "status",
@@ -187,26 +163,37 @@ describe("AgentSession bash and persistence characterization", () => {
 			details: { a: 1 },
 			excludeFromContext: true,
 		});
-		harness.setResponses([
-			(context) => {
-				userTexts = context.messages
-					.filter((message) => message.role === "user")
-					.map((message) => getMessageText(message));
-				return fauxAssistantMessage("done");
-			},
-		]);
+		await harness.session.sendCustomMessage({
+			customType: "note",
+			content: "hello",
+			display: true,
+			details: { a: 1 },
+		});
+		await harness.session.prompt("start");
 
-		await harness.session.prompt("next prompt");
-
-		expect(userTexts).toEqual(["next prompt"]);
+		expect(providerUserTexts).toEqual(["hello", "start"]);
 		const entries = harness.sessionManager.getEntries();
-		expect(entries[0]?.type).toBe("custom_message");
-		if (entries[0]?.type !== "custom_message") return;
-		expect(entries[0].excludeFromContext).toBe(true);
+		expect(entries.map((entry) => entry.type)).toEqual([
+			"custom_message",
+			"custom_message",
+			"message",
+			"message",
+			"message",
+			"message",
+		]);
+		expect(entries[0]).toMatchObject({ type: "custom_message", excludeFromContext: true });
 		expect(harness.sessionManager.buildSessionContext().messages[0]).toMatchObject({
 			role: "custom",
 			excludeFromContext: true,
 		});
+		expect(harness.session.messages.map((message) => message.role)).toEqual([
+			"custom",
+			"custom",
+			"user",
+			"assistant",
+			"toolResult",
+			"assistant",
+		]);
 	});
 
 	it("does not emit message_end for bash execution messages", async () => {

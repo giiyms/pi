@@ -560,10 +560,16 @@ describe("Agent", () => {
 		await firstPrompt.catch(() => {});
 	});
 
-	it("continue() should reserve the active run while awaiting async LLM conversion", async () => {
+	it("continue() should reserve the active run before async LLM conversion and use the filtered context tail", async () => {
 		const convertStarted = createDeferred();
 		const releaseConvert = createDeferred();
 		let convertCallCount = 0;
+		let providerMessages: Message[] = [];
+		const displayOnlyMessage = {
+			role: "displayOnly",
+			content: "status",
+			timestamp: Date.now(),
+		} as unknown as AgentMessage;
 		const agent = new Agent({
 			convertToLlm: async (messages) => {
 				convertCallCount++;
@@ -571,11 +577,14 @@ describe("Agent", () => {
 					convertStarted.resolve();
 					await releaseConvert.promise;
 				}
-				return messages.filter(
-					(message) => message.role === "user" || message.role === "assistant" || message.role === "toolResult",
-				) as Message[];
+				return messages
+					.filter((message) => (message as { role: string }).role !== "displayOnly")
+					.filter(
+						(message) => message.role === "user" || message.role === "assistant" || message.role === "toolResult",
+					) as Message[];
 			},
-			streamFn: () => {
+			streamFn: (_model, context) => {
+				providerMessages = context.messages;
 				const stream = new MockAssistantStream();
 				queueMicrotask(() => {
 					stream.push({ type: "done", reason: "stop", message: createAssistantMessage("Processed") });
@@ -587,9 +596,16 @@ describe("Agent", () => {
 			{
 				role: "user",
 				content: [{ type: "text", text: "Initial" }],
-				timestamp: Date.now(),
+				timestamp: Date.now() - 10,
 			},
+			createAssistantMessage("Initial response"),
+			displayOnlyMessage,
 		];
+		agent.followUp({
+			role: "user",
+			content: [{ type: "text", text: "Queued follow-up" }],
+			timestamp: Date.now(),
+		});
 
 		const continuePromise = agent.continue();
 		await convertStarted.promise;
@@ -601,6 +617,8 @@ describe("Agent", () => {
 		await continuePromise;
 
 		expect(convertCallCount).toBe(2);
+		expect(providerMessages[providerMessages.length - 1]?.role).toBe("user");
+		expect(agent.state.messages).toContain(displayOnlyMessage);
 	});
 
 	it("continue() should process queued follow-up messages after an assistant turn", async () => {
@@ -639,54 +657,6 @@ describe("Agent", () => {
 
 		expect(hasQueuedFollowUp).toBe(true);
 		expect(agent.state.messages[agent.state.messages.length - 1].role).toBe("assistant");
-	});
-
-	it("continue() should process queued follow-up messages after filtered state messages", async () => {
-		let providerCallCount = 0;
-		let providerMessages: Message[] = [];
-		const displayOnlyMessage = {
-			role: "displayOnly",
-			content: "status",
-			timestamp: Date.now(),
-		} as unknown as AgentMessage;
-		const agent = new Agent({
-			convertToLlm: (messages) =>
-				messages
-					.filter((message) => (message as { role: string }).role !== "displayOnly")
-					.filter(
-						(message) => message.role === "user" || message.role === "assistant" || message.role === "toolResult",
-					) as Message[],
-			streamFn: (_model, context) => {
-				providerCallCount++;
-				providerMessages = context.messages;
-				const stream = new MockAssistantStream();
-				queueMicrotask(() => {
-					stream.push({ type: "done", reason: "stop", message: createAssistantMessage("Processed") });
-				});
-				return stream;
-			},
-		});
-
-		agent.state.messages = [
-			{
-				role: "user",
-				content: [{ type: "text", text: "Initial" }],
-				timestamp: Date.now() - 10,
-			},
-			createAssistantMessage("Initial response"),
-			displayOnlyMessage,
-		];
-		agent.followUp({
-			role: "user",
-			content: [{ type: "text", text: "Queued follow-up" }],
-			timestamp: Date.now(),
-		});
-
-		await agent.continue();
-
-		expect(providerCallCount).toBe(1);
-		expect(providerMessages[providerMessages.length - 1]?.role).toBe("user");
-		expect(agent.state.messages).toContain(displayOnlyMessage);
 	});
 
 	it("continue() should keep one-at-a-time steering semantics from assistant tail", async () => {
