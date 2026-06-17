@@ -1,4 +1,5 @@
-# Files modified for caveman token optimizations (from JuliusBrussee/caveman-code).
+# Caveman overlay scope: TOKEN OPTIMIZATION ONLY.
+# Do NOT port mom, web-ui, serve/SSH, MCP, goal-loop, repomap, memory, RTK, or ML compression.
 # After syncing upstream Pi, re-apply or verify these paths still contain cave mode logic.
 packages/coding-agent/src/core/cave-tool-compression.ts
 packages/coding-agent/src/core/cave-structured-compression.ts

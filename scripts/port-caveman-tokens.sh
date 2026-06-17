@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Copy caveman token optimization sources from the caveman remote into this fork.
+# Copy caveman TOKEN OPTIMIZATION sources only from the caveman remote into this fork.
+# Explicitly excludes: mom, web-ui, serve/SSH, MCP, goal-loop, repomap, memory, RTK, ML compression.
 # Use after upstream merges that overwrite overlay files, or to refresh from caveman-code.
 set -euo pipefail
 
