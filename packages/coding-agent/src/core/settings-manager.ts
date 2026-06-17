@@ -61,6 +61,12 @@ export interface MarkdownSettings {
 	mermaid?: MermaidRenderingMode; // default: "streaming"
 }
 
+export interface CaveModeSettings {
+	enabled?: boolean; // default: true
+	intensity?: "lite" | "full" | "ultra"; // default: "full"
+	toolCompression?: boolean; // default: true
+}
+
 export interface WarningSettings {
 	anthropicExtraUsage?: boolean; // default: true
 }
@@ -134,6 +140,7 @@ export interface Settings {
 	websocketConnectTimeoutMs?: number; // WebSocket connect/open handshake timeout in milliseconds; 0 disables it
 	tuiMode?: TuiMode; // default: "regular"
 	fullscreenScrollbar?: ScrollViewScrollbar; // default: "auto"; no effect in regular TUI mode
+	caveMode?: CaveModeSettings;
 }
 
 function isMergeableObject(value: unknown): value is Record<string, unknown> {
@@ -1258,6 +1265,57 @@ export class SettingsManager {
 		this.globalSettings.markdown.mermaid = mode;
 		this.markModified("markdown", "mermaid");
 		this.save();
+	}
+
+	getCaveModeEnabled(): boolean {
+		return this.settings.caveMode?.enabled ?? true;
+	}
+
+	setCaveModeEnabled(enabled: boolean): void {
+		if (!this.globalSettings.caveMode) {
+			this.globalSettings.caveMode = {};
+		}
+		this.globalSettings.caveMode.enabled = enabled;
+		this.markModified("caveMode", "enabled");
+		this.save();
+	}
+
+	getCaveModeIntensity(): "lite" | "full" | "ultra" {
+		return this.settings.caveMode?.intensity ?? "full";
+	}
+
+	setCaveModeIntensity(intensity: "lite" | "full" | "ultra"): void {
+		if (!this.globalSettings.caveMode) {
+			this.globalSettings.caveMode = {};
+		}
+		this.globalSettings.caveMode.intensity = intensity;
+		this.markModified("caveMode", "intensity");
+		this.save();
+	}
+
+	getCaveModeToolCompression(): boolean {
+		return this.settings.caveMode?.toolCompression ?? true;
+	}
+
+	setCaveModeToolCompression(enabled: boolean): void {
+		if (!this.globalSettings.caveMode) {
+			this.globalSettings.caveMode = {};
+		}
+		this.globalSettings.caveMode.toolCompression = enabled;
+		this.markModified("caveMode", "toolCompression");
+		this.save();
+	}
+
+	getCaveModeSettings(): {
+		enabled: boolean;
+		intensity: "lite" | "full" | "ultra";
+		toolCompression: boolean;
+	} {
+		return {
+			enabled: this.getCaveModeEnabled(),
+			intensity: this.getCaveModeIntensity(),
+			toolCompression: this.getCaveModeToolCompression(),
+		};
 	}
 
 	getWarnings(): WarningSettings {
