@@ -37,6 +37,12 @@ import { getThemeByName, theme } from "../modes/interactive/theme/theme.ts";
 import { stripFrontmatter } from "../utils/frontmatter.ts";
 import { resolvePath } from "../utils/paths.ts";
 import { sleep } from "../utils/sleep.ts";
+import { applyStructuredCompressionToContentBlocks } from "./cave-structured-compression.ts";
+import {
+	applyToolBudgetToContentBlocks,
+	compressCaveToolContentBlocks,
+	ReadDeduplicationCache,
+} from "./cave-tool-compression.ts";
 import { formatNoApiKeyFoundMessage, formatNoModelSelectedMessage } from "./auth-guidance.ts";
 import { type BashResult, executeBashWithOperations } from "./bash-executor.ts";
 import {
@@ -322,6 +328,11 @@ export class AgentSession {
 	private _baseSystemPrompt = "";
 	private _baseSystemPromptOptions!: BuildSystemPromptOptions;
 
+	// Cave mode session overrides (from caveman-code token optimizations)
+	private _sessionCaveModeIntensity: "lite" | "full" | "ultra" | null = null;
+	private _sessionCaveModeDisabled = false;
+	private _readDeduplicationCache = new ReadDeduplicationCache();
+
 	constructor(config: AgentSessionConfig) {
 		this.agent = config.agent;
 		this.sessionManager = config.sessionManager;
@@ -425,8 +436,75 @@ export class AgentSession {
 		};
 
 		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
+			const caveEnabled =
+				this.settingsManager.getCaveModeToolCompression() && this.settingsManager.getCaveModeEnabled();
+
+			// Read dedup and write/edit invalidation
+			if (!isError && caveEnabled) {
+				if (toolCall.name === "read") {
+					const filePath = (args as { path?: string }).path;
+					if (filePath) {
+						const contentBlocks = result.content as Array<{ type: string; text?: string }>;
+						const fullText = contentBlocks
+							.filter((b) => b.type === "text" && typeof b.text === "string")
+							.map((b) => b.text as string)
+							.join("");
+						const stub = this._readDeduplicationCache.checkRead(filePath, fullText);
+						if (stub) {
+							const stubContent = [{ type: "text" as const, text: stub }] as typeof result.content;
+							const runner = this._extensionRunner;
+							if (!runner.hasHandlers("tool_result")) {
+								return { content: stubContent, details: result.details };
+							}
+							const hookResult = await runner.emitToolResult({
+								type: "tool_result",
+								toolName: toolCall.name,
+								toolCallId: toolCall.id,
+								input: args as Record<string, unknown>,
+								content: stubContent,
+								details: result.details,
+								isError,
+							});
+							if (!hookResult) {
+								return undefined;
+							}
+							return { content: hookResult.content, details: hookResult.details };
+						}
+					}
+				} else if (toolCall.name === "write" || toolCall.name === "edit") {
+					const filePath = (args as { path?: string }).path;
+					if (filePath) {
+						this._readDeduplicationCache.invalidate(filePath);
+					}
+				}
+			}
+
+			let processedContent = result.content;
+			if (!isError && caveEnabled) {
+				try {
+					processedContent = applyToolBudgetToContentBlocks(
+						processedContent as Array<{ type: string; text?: string; [key: string]: unknown }>,
+						toolCall.name,
+					) as typeof result.content;
+					const commandHint = toolCall.name === "bash" ? (args as { command?: string }).command : undefined;
+					processedContent = applyStructuredCompressionToContentBlocks(
+						processedContent as Array<{ type: string; text?: string; [key: string]: unknown }>,
+						toolCall.name,
+						commandHint,
+					) as typeof result.content;
+					processedContent = compressCaveToolContentBlocks(
+						processedContent as Array<{ type: string; text?: string; [key: string]: unknown }>,
+					) as typeof result.content;
+				} catch {
+					processedContent = result.content;
+				}
+			}
+
 			const runner = this._extensionRunner;
 			if (!runner.hasHandlers("tool_result")) {
+				if (processedContent !== result.content) {
+					return { content: processedContent, details: result.details };
+				}
 				return undefined;
 			}
 
@@ -435,12 +513,15 @@ export class AgentSession {
 				toolName: toolCall.name,
 				toolCallId: toolCall.id,
 				input: args as Record<string, unknown>,
-				content: result.content,
+				content: processedContent,
 				details: result.details,
 				isError,
 			});
 
 			if (!hookResult) {
+				if (processedContent !== result.content) {
+					return { content: processedContent, details: result.details };
+				}
 				return undefined;
 			}
 
@@ -899,6 +980,8 @@ export class AgentSession {
 		const validToolNames = toolNames.filter((name) => this._toolRegistry.has(name));
 		const toolSnippets: Record<string, string> = {};
 		const promptGuidelines: string[] = [];
+		const caveModeEnabled = this._sessionCaveModeDisabled ? false : this.settingsManager.getCaveModeEnabled();
+		const caveModeSettings = this.settingsManager.getCaveModeSettings();
 		for (const name of validToolNames) {
 			const snippet = this._toolPromptSnippets.get(name);
 			if (snippet) {
@@ -927,6 +1010,10 @@ export class AgentSession {
 			selectedTools: validToolNames,
 			toolSnippets,
 			promptGuidelines,
+			caveMode: {
+				enabled: caveModeEnabled,
+				intensity: this._sessionCaveModeIntensity ?? caveModeSettings.intensity,
+			},
 		};
 		return buildSystemPrompt(this._baseSystemPromptOptions);
 	}
@@ -2970,6 +3057,28 @@ export class AgentSession {
 			cost: totalCost,
 			contextUsage: this.getContextUsage(),
 		};
+	}
+
+	getCaveModeSessionState(): { enabled: boolean; intensity: "lite" | "full" | "ultra" } {
+		const settings = this.settingsManager.getCaveModeSettings();
+		return {
+			enabled: this._sessionCaveModeDisabled ? false : settings.enabled,
+			intensity: this._sessionCaveModeIntensity ?? settings.intensity,
+		};
+	}
+
+	setCaveModeSessionIntensity(intensity: "lite" | "full" | "ultra" | null): void {
+		this._sessionCaveModeIntensity = intensity;
+		this._sessionCaveModeDisabled = false;
+		this._baseSystemPrompt = this._rebuildSystemPrompt(this.getActiveToolNames());
+		this.agent.state.systemPrompt = this._baseSystemPrompt;
+	}
+
+	setCaveModeSessionDisabled(): void {
+		this._sessionCaveModeDisabled = true;
+		this._sessionCaveModeIntensity = null;
+		this._baseSystemPrompt = this._rebuildSystemPrompt(this.getActiveToolNames());
+		this.agent.state.systemPrompt = this._baseSystemPrompt;
 	}
 
 	getContextUsage(): ContextUsage | undefined {

@@ -54,6 +54,12 @@ export interface MarkdownSettings {
 	codeBlockIndent?: string; // default: "  "
 }
 
+export interface CaveModeSettings {
+	enabled?: boolean; // default: true
+	intensity?: "lite" | "full" | "ultra"; // default: "full"
+	toolCompression?: boolean; // default: true
+}
+
 export interface WarningSettings {
 	anthropicExtraUsage?: boolean; // default: true
 }
@@ -120,6 +126,7 @@ export interface Settings {
 	httpProxy?: string; // Proxy URL applied as HTTP_PROXY and HTTPS_PROXY for Pi-managed HTTP clients
 	httpIdleTimeoutMs?: number; // HTTP header/body idle timeout in milliseconds; 0 disables it
 	websocketConnectTimeoutMs?: number; // WebSocket connect/open handshake timeout in milliseconds; 0 disables it
+	caveMode?: CaveModeSettings;
 }
 
 /** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
@@ -1174,6 +1181,57 @@ export class SettingsManager {
 
 	getCodeBlockIndent(): string {
 		return this.settings.markdown?.codeBlockIndent ?? "  ";
+	}
+
+	getCaveModeEnabled(): boolean {
+		return this.settings.caveMode?.enabled ?? true;
+	}
+
+	setCaveModeEnabled(enabled: boolean): void {
+		if (!this.globalSettings.caveMode) {
+			this.globalSettings.caveMode = {};
+		}
+		this.globalSettings.caveMode.enabled = enabled;
+		this.markModified("caveMode", "enabled");
+		this.save();
+	}
+
+	getCaveModeIntensity(): "lite" | "full" | "ultra" {
+		return this.settings.caveMode?.intensity ?? "full";
+	}
+
+	setCaveModeIntensity(intensity: "lite" | "full" | "ultra"): void {
+		if (!this.globalSettings.caveMode) {
+			this.globalSettings.caveMode = {};
+		}
+		this.globalSettings.caveMode.intensity = intensity;
+		this.markModified("caveMode", "intensity");
+		this.save();
+	}
+
+	getCaveModeToolCompression(): boolean {
+		return this.settings.caveMode?.toolCompression ?? true;
+	}
+
+	setCaveModeToolCompression(enabled: boolean): void {
+		if (!this.globalSettings.caveMode) {
+			this.globalSettings.caveMode = {};
+		}
+		this.globalSettings.caveMode.toolCompression = enabled;
+		this.markModified("caveMode", "toolCompression");
+		this.save();
+	}
+
+	getCaveModeSettings(): {
+		enabled: boolean;
+		intensity: "lite" | "full" | "ultra";
+		toolCompression: boolean;
+	} {
+		return {
+			enabled: this.getCaveModeEnabled(),
+			intensity: this.getCaveModeIntensity(),
+			toolCompression: this.getCaveModeToolCompression(),
+		};
 	}
 
 	getWarnings(): WarningSettings {

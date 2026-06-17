@@ -2641,6 +2641,11 @@ export class InteractiveMode {
 				await this.handleCompactCommand(customInstructions);
 				return;
 			}
+			if (text === "/cave" || text.startsWith("/cave ")) {
+				this.handleCaveCommand(text);
+				this.editor.setText("");
+				return;
+			}
 			if (text === "/reload") {
 				this.editor.setText("");
 				await this.handleReloadCommand();
@@ -5404,6 +5409,83 @@ export class InteractiveMode {
 
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Text(info, 1, 0));
+		this.ui.requestRender();
+	}
+
+	private handleCaveCommand(text: string): void {
+		const arg = text.startsWith("/cave ") ? text.slice(6).trim().toLowerCase() : "";
+
+		if (!arg) {
+			const state = this.session.getCaveModeSessionState();
+			const status = state.enabled ? `on (intensity: ${state.intensity})` : "off";
+			this.chatContainer.addChild(new Spacer(1));
+			this.chatContainer.addChild(new Text(theme.fg("muted", `Cave mode: ${status}`), 1, 0));
+			this.ui.requestRender();
+			return;
+		}
+
+		if (arg === "on") {
+			this.session.setCaveModeSessionIntensity(this.settingsManager.getCaveModeIntensity());
+			this.chatContainer.addChild(new Spacer(1));
+			this.chatContainer.addChild(new Text(theme.fg("muted", "Cave mode: on (session)"), 1, 0));
+			this.ui.requestRender();
+			return;
+		}
+
+		if (arg === "off") {
+			this.session.setCaveModeSessionDisabled();
+			this.chatContainer.addChild(new Spacer(1));
+			this.chatContainer.addChild(new Text(theme.fg("muted", "Cave mode: off (session)"), 1, 0));
+			this.ui.requestRender();
+			return;
+		}
+
+		if (arg === "lite" || arg === "full" || arg === "ultra") {
+			this.session.setCaveModeSessionIntensity(arg);
+			this.chatContainer.addChild(new Spacer(1));
+			this.chatContainer.addChild(
+				new Text(theme.fg("muted", `Cave mode: on, intensity set to ${arg} (session)`), 1, 0),
+			);
+			this.ui.requestRender();
+			return;
+		}
+
+		if (arg === "stats") {
+			this.handleCaveStatsCommand();
+			return;
+		}
+
+		this.showWarning(`/cave: unknown argument '${arg}'. Usage: /cave [on|off|lite|full|ultra|stats]`);
+	}
+
+	private handleCaveStatsCommand(): void {
+		const state = this.session.getCaveModeSessionState();
+		const stats = this.session.getSessionStats();
+		const contextUsage = stats.contextUsage;
+
+		const lines: string[] = [];
+		lines.push(theme.fg("accent", "Cave Mode Stats"));
+		lines.push(`  Mode: ${state.enabled ? "on" : "off"}`);
+		lines.push(`  Intensity: ${state.intensity}`);
+		lines.push(`  Tool compression: ${this.settingsManager.getCaveModeToolCompression() ? "on" : "off"}`);
+		lines.push("");
+		lines.push(theme.fg("accent", "Session Tokens"));
+		lines.push(`  Input: ${stats.tokens.input.toLocaleString()}`);
+		lines.push(`  Output: ${stats.tokens.output.toLocaleString()}`);
+		lines.push(`  Cache read: ${stats.tokens.cacheRead.toLocaleString()}`);
+		lines.push(`  Cache write: ${stats.tokens.cacheWrite.toLocaleString()}`);
+		lines.push(`  Total: ${stats.tokens.total.toLocaleString()}`);
+		lines.push(`  Cost: $${stats.cost.toFixed(4)}`);
+		if (contextUsage) {
+			const pct = contextUsage.percent != null ? `${Math.round(contextUsage.percent)}%` : "unknown";
+			const tokens = contextUsage.tokens != null ? contextUsage.tokens.toLocaleString() : "unknown";
+			lines.push("");
+			lines.push(theme.fg("accent", "Context Window"));
+			lines.push(`  Used: ${tokens} / ${contextUsage.contextWindow.toLocaleString()} (${pct})`);
+		}
+
+		this.chatContainer.addChild(new Spacer(1));
+		this.chatContainer.addChild(new Text(lines.join("\n"), 1, 0));
 		this.ui.requestRender();
 	}
 

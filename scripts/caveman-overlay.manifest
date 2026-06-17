@@ -1,0 +1,11 @@
+# Files modified for caveman token optimizations (from JuliusBrussee/caveman-code).
+# After syncing upstream Pi, re-apply or verify these paths still contain cave mode logic.
+packages/coding-agent/src/core/cave-tool-compression.ts
+packages/coding-agent/src/core/cave-structured-compression.ts
+packages/coding-agent/src/core/agent-session.ts
+packages/coding-agent/src/core/settings-manager.ts
+packages/coding-agent/src/core/system-prompt.ts
+packages/coding-agent/src/core/slash-commands.ts
+packages/coding-agent/src/modes/interactive/interactive-mode.ts
+packages/coding-agent/test/cave-mode.test.ts
+packages/coding-agent/skills/caveman-compress/SKILL.md
