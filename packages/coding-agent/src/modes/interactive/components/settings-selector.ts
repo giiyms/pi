@@ -11,6 +11,7 @@ import {
 	Spacer,
 	Text,
 } from "@earendil-works/pi-tui";
+import { FORK_CONFIG } from "../../../core/fork-config.ts";
 import { formatHttpIdleTimeoutMs, HTTP_IDLE_TIMEOUT_CHOICES } from "../../../core/http-dispatcher.ts";
 import type { DefaultProjectTrust, WarningSettings } from "../../../core/settings-manager.ts";
 import { getSelectListTheme, getSettingsListTheme, theme } from "../theme/theme.ts";
@@ -476,11 +477,20 @@ export class SettingsSelectorComponent extends Container {
 			values: ["true", "false"],
 		});
 
+		const hiddenSettings = new Set<string>();
+		if (FORK_CONFIG.disableChangelog) {
+			hiddenSettings.add("collapse-changelog");
+		}
+		if (FORK_CONFIG.disableTelemetry) {
+			hiddenSettings.add("install-telemetry");
+		}
+		const visibleItems = items.filter((item) => !hiddenSettings.has(item.id));
+
 		// Add borders
 		this.addChild(new DynamicBorder());
 
 		this.settingsList = new SettingsList(
-			items,
+			visibleItems,
 			10,
 			getSettingsListTheme(),
 			(id, newValue) => {

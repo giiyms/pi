@@ -2,6 +2,7 @@ import { ProcessTerminal, setKeybindings, TUI } from "@earendil-works/pi-tui";
 import { existsSync } from "fs";
 import { APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR, getSettingsPath, PACKAGE_NAME } from "../config.ts";
 import { areExperimentalFeaturesEnabled } from "../core/experimental.ts";
+import { FORK_CONFIG } from "../core/fork-config.ts";
 import { KeybindingsManager } from "../core/keybindings.ts";
 import type { SettingsManager } from "../core/settings-manager.ts";
 import { ExtensionInputComponent } from "../modes/interactive/components/extension-input.ts";
@@ -129,6 +130,7 @@ export async function showFirstTimeSetup(settingsManager: SettingsManager): Prom
 			setTheme(detection.theme);
 			const component = new FirstTimeSetupComponent({
 				detectedTheme: detection.theme,
+				skipAnalyticsStep: FORK_CONFIG.disableTelemetry,
 				onThemePreview: (themeName) => {
 					setTheme(themeName);
 					ui.requestRender();

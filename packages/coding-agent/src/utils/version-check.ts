@@ -1,3 +1,4 @@
+import { FORK_CONFIG } from "../core/fork-config.ts";
 import { compare, valid } from "semver";
 import { getPiUserAgent } from "./pi-user-agent.ts";
 
@@ -31,7 +32,9 @@ export async function getLatestPiRelease(
 	currentVersion: string,
 	options: { timeoutMs?: number } = {},
 ): Promise<LatestPiRelease | undefined> {
-	if (process.env.PI_SKIP_VERSION_CHECK || process.env.PI_OFFLINE) return undefined;
+	if (FORK_CONFIG.disableUpdateChecks || process.env.PI_SKIP_VERSION_CHECK || process.env.PI_OFFLINE) {
+		return undefined;
+	}
 
 	const response = await fetch(LATEST_VERSION_URL, {
 		headers: {

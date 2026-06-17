@@ -35,6 +35,7 @@ check_marker packages/coding-agent/src/core/cave-structured-compression.ts "comp
 check_marker packages/coding-agent/src/core/agent-session.ts "getCaveModeSessionState"
 check_marker packages/coding-agent/src/core/settings-manager.ts "getCaveModeEnabled"
 check_marker packages/coding-agent/src/core/system-prompt.ts "buildCaveModePrompt"
+check_marker packages/coding-agent/src/core/fork-config.ts "disableTelemetry"
 
 if [[ "$FAIL" -ne 0 ]]; then
 	echo ""

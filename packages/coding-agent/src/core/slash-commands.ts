@@ -1,4 +1,5 @@
 import { APP_NAME } from "../config.ts";
+import { FORK_CONFIG } from "./fork-config.ts";
 import type { SourceInfo } from "./source-info.ts";
 
 export type SlashCommandSource = "extension" | "prompt" | "skill";
@@ -15,17 +16,15 @@ export interface BuiltinSlashCommand {
 	description: string;
 }
 
-export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
+const CORE_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 	{ name: "settings", description: "Open settings menu" },
 	{ name: "model", description: "Select model (opens selector UI)" },
 	{ name: "scoped-models", description: "Enable/disable models for Ctrl+P cycling" },
 	{ name: "export", description: "Export session (HTML default, or specify path: .html/.jsonl)" },
 	{ name: "import", description: "Import and resume a session from a JSONL file" },
-	{ name: "share", description: "Share session as a secret GitHub gist" },
 	{ name: "copy", description: "Copy last agent message to clipboard" },
 	{ name: "name", description: "Set session display name" },
 	{ name: "session", description: "Show session info and stats" },
-	{ name: "changelog", description: "Show changelog entries" },
 	{ name: "hotkeys", description: "Show all keyboard shortcuts" },
 	{ name: "fork", description: "Create a new fork from a previous user message" },
 	{ name: "clone", description: "Duplicate the current session at the current position" },
@@ -39,4 +38,15 @@ export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
 	{ name: "resume", description: "Resume a different session" },
 	{ name: "reload", description: "Reload keybindings, extensions, skills, prompts, and themes" },
 	{ name: "quit", description: `Quit ${APP_NAME}` },
+];
+
+const OPTIONAL_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
+	...(FORK_CONFIG.disableShare ? [] : [{ name: "share", description: "Share session as a secret GitHub gist" }]),
+	...(FORK_CONFIG.disableChangelog ? [] : [{ name: "changelog", description: "Show changelog entries" }]),
+];
+
+export const BUILTIN_SLASH_COMMANDS: ReadonlyArray<BuiltinSlashCommand> = [
+	...CORE_SLASH_COMMANDS.slice(0, 5),
+	...OPTIONAL_SLASH_COMMANDS,
+	...CORE_SLASH_COMMANDS.slice(5),
 ];
