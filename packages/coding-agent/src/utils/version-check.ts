@@ -1,3 +1,4 @@
+import { FORK_CONFIG } from "../core/fork-config.ts";
 import { compare, valid } from "semver";
 import { fetchWithRetry } from "./management-http.ts";
 import { getPiUserAgent } from "./pi-user-agent.ts";
@@ -52,7 +53,9 @@ export async function getLatestPiRelease(
 	currentVersion: string,
 	options: { timeoutMs?: number; retry?: boolean } = {},
 ): Promise<LatestPiRelease | undefined> {
-	if (process.env.PI_OFFLINE) return undefined;
+	if (FORK_CONFIG.disableUpdateChecks || process.env.PI_SKIP_VERSION_CHECK || process.env.PI_OFFLINE) {
+		return undefined;
+	}
 
 	const response = await fetchWithRetry(
 		LATEST_VERSION_URL,

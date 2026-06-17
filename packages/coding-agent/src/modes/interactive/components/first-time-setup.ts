@@ -11,6 +11,8 @@ export interface FirstTimeSetupResult {
 
 export interface FirstTimeSetupOptions {
 	detectedTheme: TerminalTheme;
+	/** Skip the analytics opt-in step (fork builds with telemetry disabled). */
+	skipAnalyticsStep?: boolean;
 	onThemePreview: (themeName: TerminalTheme) => void;
 	onSubmit: (result: FirstTimeSetupResult) => void;
 	onCancel: () => void;
@@ -130,6 +132,13 @@ export class FirstTimeSetupComponent extends Container {
 			this.moveSelection(1);
 		} else if (kb.matches(keyData, "tui.select.confirm") || keyData === "\n") {
 			if (this.step === "theme") {
+				if (this.options.skipAnalyticsStep) {
+					this.options.onSubmit({
+						theme: THEME_OPTIONS[this.themeIndex].value,
+						shareAnalytics: false,
+					});
+					return;
+				}
 				this.step = "analytics";
 				this.update();
 			} else {

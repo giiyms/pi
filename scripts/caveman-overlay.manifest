@@ -8,5 +8,15 @@ packages/coding-agent/src/core/settings-manager.ts
 packages/coding-agent/src/core/system-prompt.ts
 packages/coding-agent/src/core/slash-commands.ts
 packages/coding-agent/src/modes/interactive/interactive-mode.ts
+packages/coding-agent/src/modes/interactive/components/settings-selector.ts
+packages/coding-agent/src/modes/interactive/components/first-time-setup.ts
+packages/coding-agent/src/core/fork-config.ts
+packages/coding-agent/src/core/telemetry.ts
+packages/coding-agent/src/utils/version-check.ts
+packages/coding-agent/src/package-manager-cli.ts
+packages/coding-agent/src/cli/startup-ui.ts
+packages/coding-agent/src/main.ts
 packages/coding-agent/test/cave-mode.test.ts
+packages/coding-agent/test/version-check.test.ts
+packages/coding-agent/test/sdk-openrouter-attribution.test.ts
 packages/coding-agent/skills/caveman-compress/SKILL.md

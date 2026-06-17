@@ -16,6 +16,7 @@ import {
 	type SelfUpdatePackageTarget,
 	VERSION,
 } from "./config.ts";
+import { FORK_CONFIG } from "./core/fork-config.ts";
 import type { InlineExtension } from "./core/extensions/types.ts";
 import { ModelRuntime } from "./core/model-runtime.ts";
 import { DefaultPackageManager } from "./core/package-manager.ts";
@@ -686,6 +687,13 @@ export async function handlePackageCommand(
 
 	if (options.help) {
 		printPackageCommandHelp(options.command);
+		return true;
+	}
+
+	if (options.command === "update" && FORK_CONFIG.disableSelfUpdate) {
+		console.error(chalk.red(`${APP_NAME} update is disabled in this source fork.`));
+		console.error(chalk.dim("Sync upstream with: ./scripts/sync-upstream.sh"));
+		process.exitCode = 1;
 		return true;
 	}
 

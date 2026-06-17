@@ -2,6 +2,7 @@ import { ProcessTerminal, setKeybindings, type TUI, TuiMainScreen } from "@earen
 import { existsSync } from "fs";
 import { APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR, getAgentDir, getSettingsPath, PACKAGE_NAME } from "../config.ts";
 import { areExperimentalFeaturesEnabled } from "../core/experimental.ts";
+import { FORK_CONFIG } from "../core/fork-config.ts";
 import { KeybindingsManager } from "../core/keybindings.ts";
 import { DefaultPackageManager, type ResolvedResource } from "../core/package-manager.ts";
 import { SettingsManager } from "../core/settings-manager.ts";
@@ -188,6 +189,7 @@ export async function showFirstTimeSetup(settingsManager: SettingsManager): Prom
 			setTheme(detectedTheme);
 			const component = new FirstTimeSetupComponent({
 				detectedTheme,
+				skipAnalyticsStep: FORK_CONFIG.disableTelemetry,
 				onThemePreview: (themeName) => {
 					setTheme(themeName);
 					ui.requestRender();
