@@ -6,6 +6,8 @@ on:
 
 jobs:
   remove-label:
+    # Upstream automation: don't run in the giiyms fork (see gha-audit.md §5).
+    if: github.repository == 'earendil-works/pi'
     runs-on: ubuntu-latest
     permissions:
       issues: write
